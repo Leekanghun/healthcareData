@@ -7,9 +7,11 @@ const todayStr = (() => {
   return `${date.getFullYear()}-${('0' + (date.getMonth() + 1)).slice(-2)}-${date.getDate()}`;
 })()
 // json 파일 작성
-const writeJsonFile = (fileName, data) => {
-  const dataJSON = JSON.stringify(data);
-  fs.writeFileSync(fileName + '.json', dataJSON);
+const writeJsonFile = (fileName, data, 확장자) => {
+  const _확장자 = 확장자 || '.json';
+  const value = _확장자 == '.json' ? JSON.stringify(data) : data;
+
+  fs.writeFileSync(fileName + _확장자, value);
 }
 const mkdir = (path) => {
   if (!fs.existsSync(path)) {
@@ -25,7 +27,7 @@ const logger = {
       this.messageStore.push(msg);
   },
   save: function() {
-      console.log(this.messageStore.join('\n'));
+      return this.messageStore.join('\n');
   }
 }
 
@@ -62,16 +64,18 @@ const sidoCodeList = [
     const sidoCd = sidoCodeList[i][1];
 
     try {
+      // 특정 도시 검색 시작
+      logger.log(`[${sidoName}] 검색 시작__________${searchStartTime}`)
       // 해당 URL로 이동
-      console.log('해당 URL로 이동');
+      logger.log('해당 URL로 이동');
       await page.goto(`https://www.longtermcare.or.kr/npbs/r/a/201/selectXLtcoSrch.web?siDoCd=${sidoCd}&searchAdminKindCdS=01,03,06`);
 
       // 목록검색 탭으로 이동
-      console.log('[목록검색 탭으로 이동]');
+      logger.log('[목록검색 탭으로 이동]');
       await page.click('.special_tab2 > li:nth-child(2) > a');
       
       // 페이지가 로드될 때까지 기다리기
-      console.log('[페이지 로드 대기]');
+      logger.log('[페이지 로드 대기]');
       await page.waitForNavigation();
     
       // 페이지 이동하면서 모든 데이터 수집
@@ -79,7 +83,7 @@ const sidoCodeList = [
       let pageIdx = 1;
       await page.waitForTimeout(3000);
       const totalCount = await page.evaluate(() => document.querySelector('.tot_txt > strong').textContent.replace('Total ', ''));
-      console.log('[데이터 수집 시작]');
+      logger.log('[데이터 수집 시작]');
       while (true) {
         // 현재 페이지에서 정보 가져오기
         const pageData = await page.evaluate(() => {
@@ -108,7 +112,7 @@ const sidoCodeList = [
         data = data.concat(pageData);
         pageIdx++;
     
-        console.log(`[${sidoName}]데이터 검색률: ${data.length} / ${totalCount}`);
+        logger.log(`[${sidoName}]데이터 검색률: ${data.length} / ${totalCount}`);
         const pageNavigation = await page.$(`#main_paging`)
 
         // 다음 버튼명 수집
@@ -118,11 +122,11 @@ const sidoCodeList = [
         }
         
         if (!nextPageButton) {
-          console.log('[마지막 페이지 인식]');
+          logger.log('[마지막 페이지 인식]');
           break;
         } else {
           const idxCheck = await nextPageButton.evaluate(el => el.textContent);
-          console.log(`타겟 페이지: ${pageIdx} / 실제클릭 버튼명: ${idxCheck}`)
+          logger.log(`타겟 페이지: ${pageIdx} / 실제클릭 버튼명: ${idxCheck}`)
           await nextPageButton.click();
           await page.waitForNavigation();
         }
@@ -152,12 +156,12 @@ const sidoCodeList = [
       };
 
       mkdir(`errorLog/${todayStr}`);
-      writeJsonFile(`errorLog/${todayStr}/${sidoName}`, errorJSON);
+      writeJsonFile(`errorLog/${todayStr}/${sidoName}_error`, errorJSON);
     }
   }
   logger.log('[종료]');
 
-  writeJsonFile(`log/${todayStr}/log`, logger.save());
+  writeJsonFile(`log/${todayStr}/log_${new Date().getTime()}`, logger.save(), '.txt');
 
   await browser.close();
 })()
